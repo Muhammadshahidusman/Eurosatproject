@@ -7,6 +7,8 @@ wheels/
 *.egg-info
 Eurosat_Dataset/
 best_model.pth
+eurosat_cnn_final.pth
+
 
 
 # Virtual environments
