@@ -1,0 +1,13 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+Eurosat_Dataset/
+best_model.pth
+
+
+# Virtual environments
+.venv
