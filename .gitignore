@@ -9,7 +9,8 @@ Eurosat_Dataset/
 best_model.pth
 eurosat_cnn_final.pth
 
-
+Eurosat_Dataset.zip
+*.zip
 
 # Virtual environments
 .venv
