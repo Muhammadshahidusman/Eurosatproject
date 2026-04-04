@@ -62,6 +62,31 @@ The EuroSAT dataset is based on Sentinel-2 satellite imagery containing 27,000 l
   - Validation: 4,050 images
   - Test: 4,050 images
 
+### Download Dataset
+
+The dataset is not included in this repository due to its large size (~1GB). Download it from the following link:
+
+- **Google Drive**: [EuroSAT Dataset](https://drive.google.com/file/d/1cvBQILj_CpiR7KMM2xsWYVU5c1vdv2Pq/view?usp=drive_link)
+
+After downloading, extract the `Eurosat_Dataset.zip` file and place the `Eurosat_Dataset` folder in the project root directory.
+
+### Download Dataset
+
+The dataset is not included in this repository due to its large size (~2GB). Download it from:
+
+**[Google Drive - Eurosat_Dataset.zip](https://drive.google.com/file/d/1cvBQILj_CpiR7KMM2xsWYVU5c1vdv2Pq/view?usp=drive_link)**
+
+After downloading, extract the zip file and place the `Eurosat_Dataset` folder in the project root directory:
+
+```
+Eurosatproject/
+├── Eurosat_Dataset/          # <-- Extracted here
+│   ├── AnnualCrop/
+│   ├── Forest/
+│   ├── HerbaceousVegetation/
+│   └── ... (10 classes)
+```
+
 ---
 
 ## Methodology
