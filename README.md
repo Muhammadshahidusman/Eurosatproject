@@ -1,6 +1,6 @@
 # EuroSAT Land Use & Land Cover Classification
 
-A deep learning project for classifying satellite imagery using the EuroSAT RGB dataset. This project implements two approaches: a custom Convolutional Neural Network (CNN) built from scratch and a high-performance model using transfer learning with ResNet50.
+A deep learning project for classifying satellite imagery using the EuroSAT RGB dataset, extended to real-world testing on Lahore satellite image patches. This project implements two approaches: a custom Convolutional Neural Network (CNN) built from scratch and a high-performance model using transfer learning with ResNet50.
 
 ## Table of Contents
 
@@ -8,6 +8,7 @@ A deep learning project for classifying satellite imagery using the EuroSAT RGB 
 - [Dataset](#dataset)
 - [Methodology](#methodology)
 - [Results](#results)
+- [Lahore Case Study](#lahore-case-study)
 - [Project Structure](#project-structure)
 - [Requirements](#requirements)
 - [Usage](#usage)
@@ -21,6 +22,7 @@ This project demonstrates the application of deep learning for remote sensing an
 1. **Land Use & Land Cover (LULC) Classification**: Automatically classify satellite images into meaningful land cover categories.
 2. **Custom Architecture vs. Transfer Learning**: Compare the performance of a CNN built from scratch against a pretrained industry-standard model (ResNet50).
 3. **Model Evaluation**: Analyze performance using comprehensive metrics including confusion matrices and per-class accuracy.
+4. **Real-world Application**: Test the trained model on external satellite patches from Lahore to evaluate generalization.
 
 Applications of this technology include:
 - Urban planning and monitoring
@@ -34,7 +36,6 @@ Applications of this technology include:
 ## Dataset
 
 ### EuroSAT RGB
-
 The EuroSAT dataset is based on Sentinel-2 satellite imagery containing 27,000 labeled images covering 10 different land cover classes. All images are 64x64 pixels in RGB format.
 
 ### 10 Land Cover Classes
@@ -68,16 +69,7 @@ The dataset is not included in this repository due to its large size (~2GB). Dow
 
 **[Google Drive - Eurosat_Dataset.zip](https://drive.google.com/file/d/1cvBQILj_CpiR7KMM2xsWYVU5c1vdv2Pq/view?usp=drive_link)**
 
-After downloading, extract the zip file and place the `Eurosat_Dataset` folder in the project root directory:
-
-```
-Eurosatproject/
-├── Eurosat_Dataset/          # <-- Extracted here
-│   ├── AnnualCrop/
-│   ├── Forest/
-│   ├── HerbaceousVegetation/
-│   └── ... (10 classes)
-```
+After downloading, extract the zip file and place the `Eurosat_Dataset` folder in the project root directory.
 
 ---
 
@@ -95,7 +87,7 @@ A custom 3-block architecture designed to learn features from scratch.
 ### 2. Transfer Learning (ResNet50)
 Leverages a pretrained ResNet50 model trained on ImageNet for superior feature extraction.
 - **Architecture**: ResNet50 backbone with a replaced final fully connected layer.
-- **Input Size**: 224 x 224 pixels (ResNet standard).
+- **Input Size**: 64 x 64 pixels (resized for EuroSAT).
 - **Strategy**: Full fine-tuning of all layers.
 - **Goal**: Maximize classification accuracy using deep residual learning.
 
@@ -103,7 +95,7 @@ Leverages a pretrained ResNet50 model trained on ImageNet for superior feature e
 
 | Feature | Custom CNN | ResNet50 (Transfer Learning) |
 |----------|------------|------------------------------|
-| **Input Resolution** | 64 x 64 | 224 x 224 |
+| **Input Resolution** | 64 x 64 | 64 x 64 |
 | **Pretrained Weights** | None (From Scratch) | ImageNet Weights |
 | **Parameters** | ~1.5 Million | ~25 Million |
 | **Expected Accuracy** | ~90% | ~97-98% |
@@ -126,7 +118,6 @@ The models were trained for 20 epochs, yielding the following outcomes:
 
 ### Evaluation Artifacts
 The project generates the following visualizations for both models:
-
 1. **Training Curves** (`training_curves.png`): Loss and accuracy progression.
 2. **Confusion Matrix** (`confusion_matrix.png`): Visualizing misclassifications.
 3. **Per-Class Accuracy** (`per_class_accuracy.png`): Breakdown of performance for each of the 10 classes.
@@ -136,7 +127,23 @@ The project generates the following visualizations for both models:
 | Model | Checkpoint | Results Directory |
 |-------|------------|-------------------|
 | **Custom CNN** | `eurosat_cnn_final.pth` | Project Root |
-| **ResNet50** | `ResNet 50/eurosat_resnet50_final.pth` | `ResNet 50/` |
+| **ResNet50** | `models/resnet50/eurosat_resnet50_final.pth` | `models/resnet50/` |
+
+---
+
+## Lahore Case Study
+
+To evaluate the generalization of the ResNet50 model, it was applied to a set of **4,481 satellite image patches** from Lahore.
+
+### Implementation
+- **Input**: 64x64 RGB patches.
+- **Preprocessing**: ImageNet normalization and resizing.
+- **Inference**: The `src/lahore_inference.py` script processes all patches and generates predictions.
+
+### Findings
+The model successfully classified the Lahore imagery into EuroSAT categories. Preliminary analysis showed a high frequency of **Pasture** and **Industrial** land covers, reflecting the mixed urban and rural nature of the region.
+
+**Results saved to:** `results/lahore_predictions.png`
 
 ---
 
@@ -145,28 +152,27 @@ The project generates the following visualizations for both models:
 ```
 Eurosatproject/
 │
-├── eurosat_classification.ipynb   # Custom CNN training pipeline
-├── eurosat_resnet50.ipynb        # ResNet50 transfer learning pipeline
-├── README.md                       # Project documentation
-├── pyproject.toml                  # Project dependencies
-├── main.py                         # Entry point script
+├── notebooks/                    # Jupyter notebooks for training and acquisition
+│   ├── eurosat_classification.ipynb # Custom CNN training pipeline
+│   ├── eurosat_resnet50.ipynb       # ResNet50 transfer learning pipeline
+│   └── patches_64_64.ipynb         # Patch generation
 │
-├── Eurosat_Dataset/                # Directory containing 27,000 images
+├── src/                          # Source code
+│   └── lahore_inference.py       # Inference pipeline for Lahore dataset
 │
-├── ResNet 50/                      # Results and checkpoints for ResNet50
-│   ├── eurosat_resnet50_final.pth
-│   ├── best_model.pth
-│   └── ... (visualizations)
+├── data/                         # Datasets
+│   └── Lahore_Dataset/patches/    # Lahore satellite image patches
 │
-├── eurosat_cnn_final.pth           # Custom CNN saved model checkpoint
-├── best_model.pth                  # Custom CNN best weights
+├── models/                       # Model checkpoints
+│   └── resnet50/
+│       └── eurosat_resnet50_final.pth
 │
-└── outputs/                        # Generated visualizations (Custom CNN)
-    ├── training_curves.png
-    ├── confusion_matrix.png
-    ├── per_class_accuracy.png
-    ├── eda_samples.png
-    └── eda_distribution.png
+├── results/                      # Visualizations and results
+│   └── lahore_predictions.png     # Prediction grid for Lahore
+│
+├── README.md                     # Project documentation
+├── pyproject.toml                # Project dependencies
+└── uv.lock                       # Lock file for dependencies
 ```
 
 ---
@@ -178,10 +184,11 @@ This project uses Python 3.10+ and the following packages:
 - `torch`, `torchvision`
 - `numpy`, `matplotlib`, `seaborn`
 - `scikit-learn`, `Pillow`, `tqdm`
+- `rasterio`
 - `jupyter`, `ipykernel`
 
 ### Hardware
-- **GPU**: CUDA-compatible GPU recommended (e.g., NVIDIA Quadro P2000).
+- **GPU**: CUDA-compatible GPU recommended.
 - **CPU**: Fallback available if CUDA is not present.
 
 ---
@@ -193,21 +200,13 @@ This project uses Python 3.10+ and the following packages:
 2. Install dependencies: `uv sync` or `pip install -r requirements.txt`.
 
 ### Running the Models
-- **For Custom CNN**: Run `jupyter notebook eurosat_classification.ipynb`.
-- **For ResNet50**: Run `jupyter notebook eurosat_resnet50.ipynb`.
-  - *Note: For ResNet50, ensure you have the pretrained weights available or have an active internet connection for the initial download.*
+- **For Custom CNN**: Run the notebook `notebooks/eurosat_classification.ipynb`.
+- **For ResNet50**: Run the notebook `notebooks/eurosat_resnet50.ipynb`.
 
-### Using a Trained Model
-To load a checkpoint and make predictions:
-```python
-import torch
-from torchvision import transforms
-
-# Load ResNet50 checkpoint
-checkpoint = torch.load('ResNet 50/eurosat_resnet50_final.pth')
-# (Recreate model architecture as defined in the notebook)
-model.load_state_dict(checkpoint['model_state'])
-model.eval()
+### Running Lahore Inference
+To run the model on the Lahore dataset:
+```bash
+uv run python3 src/lahore_inference.py
 ```
 
 ---
