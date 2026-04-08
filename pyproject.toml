@@ -18,6 +18,7 @@ dependencies = [
     "earthengine-api>=0.1.0",
     "geemap>=0.20.0",
     "dotenv>=0.9.9",
+    "rasterio>=1.4.4",
 ]
 
 [tool.uv.sources]
