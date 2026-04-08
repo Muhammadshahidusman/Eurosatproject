@@ -1,6 +1,6 @@
 # EuroSAT Land Use & Land Cover Classification
 
-A deep learning project for classifying satellite imagery using the EuroSAT RGB dataset. This project implements a custom Convolutional Neural Network (CNN) from scratch to identify 10 different types of land cover from Sentinel-2 satellite imagery.
+A deep learning project for classifying satellite imagery using the EuroSAT RGB dataset. This project implements two approaches: a custom Convolutional Neural Network (CNN) built from scratch and a high-performance model using transfer learning with ResNet50.
 
 ## Table of Contents
 
@@ -18,9 +18,9 @@ A deep learning project for classifying satellite imagery using the EuroSAT RGB 
 
 This project demonstrates the application of deep learning for remote sensing and environmental monitoring. The primary objectives are:
 
-1. **Land Use & Land Cover (LULC) Classification**: Automatically classify satellite images into meaningful land cover categories
-2. **CNN from Scratch**: Build and train a custom neural network architecture without using pre-trained models
-3. **Model Evaluation**: Analyze performance using comprehensive metrics including confusion matrices and per-class accuracy
+1. **Land Use & Land Cover (LULC) Classification**: Automatically classify satellite images into meaningful land cover categories.
+2. **Custom Architecture vs. Transfer Learning**: Compare the performance of a CNN built from scratch against a pretrained industry-standard model (ResNet50).
+3. **Model Evaluation**: Analyze performance using comprehensive metrics including confusion matrices and per-class accuracy.
 
 Applications of this technology include:
 - Urban planning and monitoring
@@ -64,14 +64,6 @@ The EuroSAT dataset is based on Sentinel-2 satellite imagery containing 27,000 l
 
 ### Download Dataset
 
-The dataset is not included in this repository due to its large size (~1GB). Download it from the following link:
-
-- **Google Drive**: [EuroSAT Dataset](https://drive.google.com/file/d/1cvBQILj_CpiR7KMM2xsWYVU5c1vdv2Pq/view?usp=drive_link)
-
-After downloading, extract the `Eurosat_Dataset.zip` file and place the `Eurosat_Dataset` folder in the project root directory.
-
-### Download Dataset
-
 The dataset is not included in this repository due to its large size (~2GB). Download it from:
 
 **[Google Drive - Eurosat_Dataset.zip](https://drive.google.com/file/d/1cvBQILj_CpiR7KMM2xsWYVU5c1vdv2Pq/view?usp=drive_link)**
@@ -91,94 +83,60 @@ Eurosatproject/
 
 ## Methodology
 
-### Model Architecture
+The project implements two distinct modeling strategies:
 
-The project uses a custom 3-block CNN architecture:
+### 1. Custom CNN (Baseline)
+A custom 3-block architecture designed to learn features from scratch.
+- **Architecture**: `Conv → BatchNorm → ReLU` (x2 per block) $\rightarrow$ `MaxPool` $\rightarrow$ `Dropout`.
+- **Input Size**: 64 x 64 pixels.
+- **Complexity**: ~1.5M trainable parameters.
+- **Goal**: Establish a performance baseline for the dataset.
 
-```
-Input: [3 × 64 × 64]
-    |
-    ├── Conv Block 1  →  32 filters  →  MaxPool  →  [32 × 32 × 32]
-    ├── Conv Block 2  →  64 filters  →  MaxPool  →  [64 × 16 × 16]
-    ├── Conv Block 3  → 128 filters  →  MaxPool  →  [128 × 8 × 8]
-    |
-    └── FC Head  →  Flatten → 512 → 256 → 10 (Softmax)
-```
+### 2. Transfer Learning (ResNet50)
+Leverages a pretrained ResNet50 model trained on ImageNet for superior feature extraction.
+- **Architecture**: ResNet50 backbone with a replaced final fully connected layer.
+- **Input Size**: 224 x 224 pixels (ResNet standard).
+- **Strategy**: Full fine-tuning of all layers.
+- **Goal**: Maximize classification accuracy using deep residual learning.
 
-Each convolutional block consists of:
-```
-Conv2d → BatchNorm2d → ReLU → Conv2d → BatchNorm2d → ReLU → MaxPool2d → Dropout2d
-```
+### Comparison Summary
 
-**Total Parameters**: ~1.5M trainable parameters
+| Feature | Custom CNN | ResNet50 (Transfer Learning) |
+|----------|------------|------------------------------|
+| **Input Resolution** | 64 x 64 | 224 x 224 |
+| **Pretrained Weights** | None (From Scratch) | ImageNet Weights |
+| **Parameters** | ~1.5 Million | ~25 Million |
+| **Expected Accuracy** | ~90% | ~97-98% |
 
-### Training Configuration
-
-| Hyperparameter | Value |
-|----------------|-------|
-| **Batch Size** | 64 |
-| **Epochs** | 20 |
-| **Learning Rate** | 0.001 |
-| **Optimizer** | Adam |
-| **Weight Decay** | 0.0001 |
-| **Scheduler** | StepLR (gamma=0.5, step_size=7) |
-| **Loss Function** | CrossEntropyLoss |
-
-### Data Augmentation
-
-Training images are augmented to improve model generalization:
-- Random Horizontal Flip (p=0.5)
-- Random Vertical Flip (p=0.5)
-- Random Rotation (±15 degrees)
-- Color Jitter (brightness, contrast, saturation)
-
-### Normalization
-
-Images are normalized using dataset-specific statistics:
-- **Mean**: [0.3444, 0.3803, 0.4078]
-- **Std**: [0.2034, 0.1365, 0.1148]
+### Training Configuration (Common)
+- **Optimizer**: Adam
+- **Loss Function**: CrossEntropyLoss
+- **Scheduler**: StepLR (halves LR periodically)
+- **Augmentation**: Random flips, rotations, and color jittering.
 
 ---
 
 ## Results
 
-The model was trained for 20 epochs with the following outcomes:
+The models were trained for 20 epochs, yielding the following outcomes:
 
-### Training Performance
+### Performance Comparison
+- **Custom CNN**: Provides a strong baseline with high accuracy across most classes.
+- **ResNet50**: Significant improvement in accuracy and robustness, particularly in distinguishing similar land covers.
 
-- **Best Validation Accuracy**: Achieved during training
-- **Test Accuracy**: Evaluated on held-out test set
+### Evaluation Artifacts
+The project generates the following visualizations for both models:
 
-### Evaluation Metrics
-
-The project produces the following evaluation artifacts:
-
-1. **Training Curves** (`training_curves.png`)
-   - Loss progression over epochs
-   - Accuracy progression over epochs
-
-2. **Confusion Matrix** (`confusion_matrix.png`)
-   - Visual representation of model predictions vs. true labels
-   - Helps identify which classes are most confused
-
-3. **Per-Class Accuracy** (`per_class_accuracy.png`)
-   - Individual accuracy for each of the 10 land cover classes
-   - Color-coded performance thresholds:
-     - Green: ≥ 90%
-     - Orange: 75–89%
-     - Red: < 75%
+1. **Training Curves** (`training_curves.png`): Loss and accuracy progression.
+2. **Confusion Matrix** (`confusion_matrix.png`): Visualizing misclassifications.
+3. **Per-Class Accuracy** (`per_class_accuracy.png`): Breakdown of performance for each of the 10 classes.
 
 ### Output Files
 
-| File | Description |
-|------|-------------|
-| `eurosat_cnn_final.pth` | Complete model checkpoint with architecture and hyperparameters |
-| `best_model.pth` | Best model state based on validation accuracy |
-| `training_curves.png` | Training and validation loss/accuracy plots |
-| `confusion_matrix.png` | 10x10 confusion matrix visualization |
-| `per_class_accuracy.png` | Horizontal bar chart of per-class accuracies |
-| `eda_samples.png` | Sample images from each class |
-| `eda_distribution.png` | Class distribution across dataset |
+| Model | Checkpoint | Results Directory |
+|-------|------------|-------------------|
+| **Custom CNN** | `eurosat_cnn_final.pth` | Project Root |
+| **ResNet50** | `ResNet 50/eurosat_resnet50_final.pth` | `ResNet 50/` |
 
 ---
 
@@ -187,17 +145,23 @@ The project produces the following evaluation artifacts:
 ```
 Eurosatproject/
 │
-├── eurosat_classification.ipynb   # Main Jupyter notebook with training pipeline
-├── README.md                       # This file
+├── eurosat_classification.ipynb   # Custom CNN training pipeline
+├── eurosat_resnet50.ipynb        # ResNet50 transfer learning pipeline
+├── README.md                       # Project documentation
 ├── pyproject.toml                  # Project dependencies
 ├── main.py                         # Entry point script
 │
 ├── Eurosat_Dataset/                # Directory containing 27,000 images
 │
-├── eurosat_cnn_final.pth           # Saved model checkpoint
-├── best_model.pth                  # Best model weights
+├── ResNet 50/                      # Results and checkpoints for ResNet50
+│   ├── eurosat_resnet50_final.pth
+│   ├── best_model.pth
+│   └── ... (visualizations)
 │
-└── outputs/                        # Generated visualizations
+├── eurosat_cnn_final.pth           # Custom CNN saved model checkpoint
+├── best_model.pth                  # Custom CNN best weights
+│
+└── outputs/                        # Generated visualizations (Custom CNN)
     ├── training_curves.png
     ├── confusion_matrix.png
     ├── per_class_accuracy.png
@@ -210,105 +174,47 @@ Eurosatproject/
 ## Requirements
 
 ### Dependencies
-
-This project uses Python 3.10 and the following packages:
-
-```
-torch==1.13.1+cu117
-torchvision==0.14.1+cu117
-numpy<2
-matplotlib>=3.5.0
-seaborn>=0.11.0
-scikit-learn>=1.0.0
-Pillow>=9.0.0
-tqdm>=4.60.0
-jupyter>=1.0.0
-ipykernel>=6.0.0
-```
+This project uses Python 3.10+ and the following packages:
+- `torch`, `torchvision`
+- `numpy`, `matplotlib`, `seaborn`
+- `scikit-learn`, `Pillow`, `tqdm`
+- `jupyter`, `ipykernel`
 
 ### Hardware
-
-- **GPU**: CUDA-compatible GPU (tested on NVIDIA Quadro P2000 with 4.2 GB VRAM)
-- **CPU**: Fallback to CPU if CUDA is not available
+- **GPU**: CUDA-compatible GPU recommended (e.g., NVIDIA Quadro P2000).
+- **CPU**: Fallback available if CUDA is not present.
 
 ---
 
 ## Usage
 
 ### Setup
+1. Clone the repository and navigate to the project directory.
+2. Install dependencies: `uv sync` or `pip install -r requirements.txt`.
 
-1. Clone the repository and navigate to the project directory:
-   ```bash
-   cd Eurosatproject
-   ```
+### Running the Models
+- **For Custom CNN**: Run `jupyter notebook eurosat_classification.ipynb`.
+- **For ResNet50**: Run `jupyter notebook eurosat_resnet50.ipynb`.
+  - *Note: For ResNet50, ensure you have the pretrained weights available or have an active internet connection for the initial download.*
 
-2. Create a virtual environment and install dependencies:
-   ```bash
-   # Using uv (recommended)
-   uv sync
-
-   # Or using pip
-   pip install -r requirements.txt
-   ```
-
-3. Activate the virtual environment:
-   ```bash
-   source .venv/bin/activate  # Linux/Mac
-   .venv\Scripts\activate     # Windows
-   ```
-
-### Training
-
-Run the Jupyter notebook to train the model:
-
-```bash
-jupyter notebook eurosat_classification.ipynb
-```
-
-Or use the main script:
-
-```bash
-python main.py
-```
-
-### Using the Trained Model
-
-To load and use the saved model:
-
+### Using a Trained Model
+To load a checkpoint and make predictions:
 ```python
 import torch
 from torchvision import transforms
 
-# Load checkpoint
-checkpoint = torch.load('eurosat_cnn_final.pth')
-
-# Recreate model architecture
-from eurosat_classification import EuroSAT_CNN  # Import from notebook
-model = EuroSAT_CNN(num_classes=10)
+# Load ResNet50 checkpoint
+checkpoint = torch.load('ResNet 50/eurosat_resnet50_final.pth')
+# (Recreate model architecture as defined in the notebook)
 model.load_state_dict(checkpoint['model_state'])
-
-# Make predictions
 model.eval()
-with torch.no_grad():
-    output = model(input_image)
-    prediction = output.argmax(1).item()
 ```
 
 ---
 
-## Notes
-
-- The notebook includes an optional section for transfer learning using ResNet50, which could potentially improve accuracy to ~97-98%
-- All training uses a fixed random seed (42) for reproducibility
-- The model checkpoint includes hyperparameters for easy reproduction of results
-
----
-
 ## License
-
 This project is developed for educational purposes.
 
 ## Acknowledgments
-
 - EuroSAT dataset source: [EuroSAT: A Novel Dataset and Deep Learning Benchmark for Land Use and Land Cover Classification](https://github.com/phelber/EuroSAT)
 - Sentinel-2 imagery provided by the European Space Agency (ESA)
