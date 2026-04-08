@@ -3,7 +3,7 @@ name = "eurosatproject"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10, <3.11"
+requires-python = ">=3.10, <3.12"
 dependencies = [
     "ipykernel>=6.0.0",
     "jupyter>=1.0.0",
@@ -15,6 +15,9 @@ dependencies = [
     "torchvision==0.14.1+cu117",
     "tqdm>=4.60.0",
     "Pillow>=9.0.0",
+    "earthengine-api>=0.1.0",
+    "geemap>=0.20.0",
+    "dotenv>=0.9.9",
 ]
 
 [tool.uv.sources]
