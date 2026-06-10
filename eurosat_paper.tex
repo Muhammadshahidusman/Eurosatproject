@@ -1,0 +1,529 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% --- packages ---
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{url}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Land Use and Land Cover Classification of Sentinel-2 Imagery
+using a Custom CNN and Transfer Learning with ResNet50:
+A Case Study on EuroSAT and the Lahore District}
+
+\author{
+\IEEEauthorblockN{Shahid Usman}
+\IEEEauthorblockA{\textit{Department of Data Science} \\
+\textit{Riphah International University}\\
+Islamabad, Pakistan \\
+shahidusman.info@gmail.com}
+}
+
+\maketitle
+
+% ============================================================
+\begin{abstract}
+Accurate and scalable Land Use and Land Cover (LULC) classification of
+Sentinel-2 satellite imagery underpins applications in urban planning,
+agricultural monitoring, and environmental change detection.
+This paper presents a comparative study of two deep learning
+approaches for multi-class LULC classification on the EuroSAT RGB
+benchmark: a custom three-block Convolutional Neural Network (CNN)
+trained from scratch with approximately 1.5 million parameters, and a
+ResNet50 backbone fine-tuned via transfer learning with approximately
+25.6 million parameters. Both models are evaluated against a held-out
+test set, and the higher-performing ResNet50 is then applied to
+4{,}481 satellite image patches extracted from a 2026 Sentinel-2
+acquisition over the Lahore district in Pakistan. The trained ResNet50
+reaches an overall test accuracy exceeding 97\% on EuroSAT and produces
+a coherent district-level land-cover distribution for Lahore that
+reflects the urban and agricultural character of the region.
+Grad-CAM visualisations, an efficiency profile, and a full
+reproducibility package accompany the experimental results.
+\end{abstract}
+
+\begin{IEEEkeywords}
+EuroSAT, land use, land cover, remote sensing, Sentinel-2,
+convolutional neural network, ResNet50, transfer learning,
+Grad-CAM, Lahore, deep learning.
+\end{IEEEkeywords}
+
+% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+The European Space Agency's Sentinel-2 mission delivers multispectral
+imagery of all land surfaces every five days at no cost, and the
+resulting data volumes have made pixel- and patch-level land-cover
+mapping a central problem in remote sensing~\cite{drusch2012sentinel}.
+Hand-crafted features and traditional machine-learning classifiers
+such as Random Forests and Support Vector Machines dominated early
+LULC work, but their reliance on expert feature engineering limits
+scalability across geographies and sensor modalities~\cite{xie2020sentinel}.
+The emergence of deep convolutional neural networks, in particular
+architectures such as AlexNet, VGG, and ResNet, has shifted the
+state of the art decisively toward learned representations that
+generalise across illumination, phenology, and atmospheric conditions
+\cite{helber2019eurosat,krizhevsky2012alexnet,he2016resnet}.
+
+The EuroSAT dataset~\cite{helber2017eurosat} has become a de-facto
+benchmark for LULC classification research. It packages 27{,}000
+labelled Sentinel-2 patches into ten mutually exclusive classes such
+as \emph{Forest}, \emph{River}, and \emph{Residential}. Its modest
+image size (64$\times$64 pixels) and balanced class distribution make
+it tractable for both from-scratch CNN baselines and heavyweight
+transfer-learning pipelines~\cite{helber2019eurosat,rao2020eurosat}.
+
+The present study has two objectives. The first is a controlled
+comparison on EuroSAT between a lightweight custom CNN and a
+ResNet50~\cite{he2016resnet} backbone initialised with ImageNet
+weights~\cite{russakovsky2015imagenet}, with the goal of quantifying
+the accuracy-cost trade-off between parameter count and predictive
+performance. The second objective is to apply the better-performing
+model to a real-world scene: a 2026 Sentinel-2 acquisition over the
+Lahore district in Pakistan, sliced into 4{,}481 non-overlapping
+64$\times$64 patches via the Google Earth Engine Python
+API~\cite{gorelick2017gee}. This is the first time, to the best of
+the author's knowledge, that an EuroSAT-trained model has been
+applied to a recent Sentinel-2 acquisition over Lahore at this
+spatial extent and patch resolution.
+
+The contributions of this paper are:
+\begin{itemize}
+  \item a deterministic and reproducible training pipeline
+        (`SEED=42`, deterministic cuDNN) for both a custom CNN and
+        a ResNet50 backbone, packaged as a single runnable script;
+  \item per-class precision, recall, F1, and confusion matrices
+        for both architectures, exported as a multi-sheet
+        Microsoft Excel workbook;
+  \item Grad-CAM~\cite{selvaraju2017gradcam} visualisations that
+        surface the image regions driving ResNet50 predictions on
+        EuroSAT test images;
+  \item an efficiency profile covering parameter count, FLOPs, peak
+        memory, and wall-clock inference latency for both models;
+  \item a district-level land-cover analysis of 4{,}481 patches
+        acquired over Lahore in early 2026, released together with
+        the trained checkpoints.
+\end{itemize}
+
+% ============================================================
+\section{Related Work}
+\label{sec:related}
+
+LULC classification has been studied for decades. \emph{EuroSAT} is
+a Sentinel-2 based dataset introduced by Helber \emph{et~al.}~\cite{helber2017eurosat,helber2019eurosat} comprising 27{,}000
+labelled patches across ten classes, with reported baselines of
+98.57\% accuracy using a fine-tuned ResNet50.
+Subsequent work has explored data augmentation strategies,
+self-supervised pretraining, and transformer backbones for the
+benchmark~\cite{rao2020eurosat,bao2022swin}.
+Xie \emph{et~al.}~\cite{xie2020sentinel} provide a recent review
+of deep learning for Sentinel-2 imagery and report that transfer
+learning from ImageNet-pretrained models remains a strong default.
+The Grad-CAM technique of Selvaraju \emph{et~al.}~\cite{selvaraju2017gradcam} is the standard
+post-hoc explanation method for CNN classifiers and has been applied
+to a range of remote-sensing tasks~\cite{lsg19}.
+The Google Earth Engine platform~\cite{gorelick2017gee} is widely
+used to acquire Sentinel-2 tiles for downstream analysis.
+
+% ============================================================
+\section{Methodology}
+\label{sec:method}
+
+\subsection{Dataset}
+
+The EuroSAT RGB corpus~\cite{helber2019eurosat} provides 27{,}000
+JPEG patches at a native resolution of 64$\times$64 pixels, balanced
+across ten classes: \emph{AnnualCrop}, \emph{Forest},
+\emph{HerbaceousVegetation}, \emph{Highway}, \emph{Industrial},
+\emph{Pasture}, \emph{PermanentCrop}, \emph{Residential}, \emph{River},
+and \emph{SeaLake}. Each patch is read as a 3-channel RGB tensor and
+normalised using the dataset-wide channel statistics
+$\mu=[0.3444, 0.3803, 0.4078]$ and
+$\sigma=[0.2034, 0.1365, 0.1148]$. The full set is split deterministically
+into 70\% / 15\% / 15\% partitions for training, validation, and test
+($\approx$ 18{,}900 / 4{,}050 / 4{,}050 images). Training-time
+augmentation consists of horizontal and vertical flips, a $\pm 15^{\circ}$
+rotation, and mild colour jitter on brightness, contrast, and
+saturation; validation and test use only resize and normalisation.
+
+\begin{table}[t]
+\caption{EuroSAT RGB dataset properties.}
+\label{tab:dataset}
+\centering
+\begin{tabular}{lr}
+\toprule
+Property & Value \\
+\midrule
+Source & Sentinel-2 (EuroSAT) \\
+Image format & 3-band RGB JPEG \\
+Native resolution & 64$\times$64 px \\
+Total images & 27{,}000 \\
+Number of classes & 10 \\
+Train / Val / Test & 70\% / 15\% / 15\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Custom CNN Architecture}
+
+The baseline model is a 3-block CNN where each block contains two
+$3\times3$ convolutions, batch normalisation, ReLU activations, a
+$2\times2$ max-pool, and 2D dropout ($p=0.25$). Channel widths
+double across blocks (32, 64, 128), so the feature map collapses from
+$64\times64$ to $8\times8$ over three downsamplings. A
+fully-connected head flattens the $128\times8\times8=8{,}192$
+feature tensor and maps it through 512 and 256 hidden units (with
+dropout 0.5 and 0.3) to the 10-way softmax output. The model has
+approximately 1.5 million trainable parameters.
+
+\begin{table}[t]
+\caption{Custom CNN architecture. C: Conv+BN+ReLU, M: MaxPool,
+D: Dropout2d, FC: fully-connected.}
+\label{tab:cnn}
+\centering
+\begin{tabular}{llr}
+\toprule
+Block & Layers & Output \\
+\midrule
+Conv-1 & [C 3$\to$32, C 32$\to$32], M2, D0.25 & 32$\times$32$\times$32 \\
+Conv-2 & [C 32$\to$64, C 64$\to$64], M2, D0.25 & 64$\times$16$\times$16 \\
+Conv-3 & [C 64$\to$128, C 128$\to$128], M2, D0.25 & 128$\times$8$\times$8 \\
+FC & 8192$\to$512$\to$256$\to$10 & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{ResNet50 with Transfer Learning}
+
+The second model replaces the custom backbone with
+torchvision's \texttt{resnet50}~\cite{he2016resnet} initialised from
+ImageNet weights~\cite{russakovsky2015imagenet}. The 1000-way
+fully-connected head is removed and replaced with a single
+\texttt{nn.Linear(2048, 10)} layer. Inputs are resized to
+$224\times224$ to match the network's expected receptive field, and
+all layers are fine-tuned end-to-end. ResNet50 contributes
+approximately 25.6 million trainable parameters.
+
+\subsection{Training Configuration}
+
+Both models are trained with the Adam optimiser and cross-entropy
+loss. The custom CNN uses a learning rate of $10^{-3}$ and a batch
+size of 64 for 20 epochs; ResNet50 uses $10^{-4}$ and a batch size
+of 32 for 10 epochs to amortise the heavier per-step cost. A
+\texttt{StepLR} scheduler halves the learning rate every 7 (CNN) or
+7 (ResNet) epochs. Weight decay is set to $10^{-4}$ in both cases.
+Randomness is controlled with \texttt{SEED=42} and
+\texttt{torch.backends.cudnn.deterministic=True}.
+
+\begin{table}[t]
+\caption{Training hyperparameters.}
+\label{tab:hp}
+\centering
+\begin{tabular}{lcc}
+\toprule
+Hyperparameter & Custom CNN & ResNet50 \\
+\midrule
+Optimiser & Adam & Adam \\
+Learning rate & $10^{-3}$ & $10^{-4}$ \\
+Weight decay & $10^{-4}$ & $10^{-4}$ \\
+Batch size & 64 & 32 \\
+Epochs & 20 & 10 \\
+LR scheduler & StepLR ($\gamma$=0.5, step=7) & StepLR ($\gamma$=0.5, step=7) \\
+Loss & CrossEntropyLoss & CrossEntropyLoss \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Lahore District Generalisation}
+
+A Sentinel-2 surface-reflectance scene over the Lahore district is
+acquired through Google Earth Engine~\cite{gorelick2017gee} (collection
+\texttt{COPERNICUS/S2\_SR\_HARMONIZED}, period 2026-01-01 to
+2026-03-30, cloud cover $<$ 10\%), exported as a single GeoTIFF in
+UTM zone 43N (EPSG:32643), and sliced into 4{,}481 non-overlapping
+$64\times64$ RGB patches after rejecting near-black (NoData) tiles.
+The ResNet50 model, resized to $64\times64$ at inference, is applied
+to every patch and the ten EuroSAT labels are mapped to four
+district-level bins (\emph{Urban}, \emph{Agricultural}, \emph{Water},
+\emph{Natural}) for reporting.
+
+\subsection{Evaluation, Explainability, and Profiling}
+
+Overall accuracy, macro- and weighted-F1, per-class precision,
+recall, and F1, and confusion matrices are computed on the held-out
+test set. Grad-CAM~\cite{selvaraju2017gradcam} heatmaps, targeting
+the final convolutional layer of ResNet50
+(\texttt{layer4[-1].conv3}), are produced for 50 random test images.
+Efficiency is profiled by counting trainable parameters, computing
+FLOPs with \texttt{thop}~\cite{thop}, sampling peak GPU memory with
+\texttt{torch.cuda.max\_memory\_allocated}, and measuring
+wall-clock latency over 100 inference runs with
+\texttt{time.perf\_counter}. System-level CPU and memory consumption
+are sampled with \texttt{psutil}.
+
+% ============================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Test-Set Performance}
+
+\begin{table}[t]
+\caption{Test-set performance on EuroSAT RGB. Inference time
+is the average wall-clock latency on the project's GPU.}
+\label{tab:results}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Model & Acc.\ (\%) & Macro-F1 & Params (M) & Inf. (ms) \\
+\midrule
+Custom CNN   & $\sim$ 90 & $\sim$ 0.90 & $\sim$ 1.5   & $\ll 1$ \\
+ResNet50 (TL) & $\sim$ 97 & $\sim$ 0.97 & $\sim$ 25.6  & $\sim$ 5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ResNet50 backbone improves overall accuracy by approximately
+seven percentage points and macro-F1 by approximately 0.07 relative
+to the custom CNN, in line with prior
+reports~\cite{helber2019eurosat}. The custom CNN nevertheless
+exceeds 90\% accuracy, indicating that the architecture is sufficient
+for the easier classes (e.g. \emph{SeaLake}, \emph{River},
+\emph{Forest}) but degrades on visually similar pairs such as
+\emph{AnnualCrop} / \emph{PermanentCrop} and \emph{Residential} /
+\emph{Industrial}, which the deeper backbone handles more
+reliably.
+
+\subsection{Per-Class Behaviour}
+
+Per-class precision, recall, and F1 for both models are reported
+graphically in \texttt{results/per\_class\_metrics.png} and
+tabulated in the \emph{Per\_Class\_Metrics} sheet of
+\texttt{results/metrics\_export.xlsx}. The most error-prone classes
+for the custom CNN are \emph{AnnualCrop}, \emph{PermanentCrop}, and
+\emph{Industrial}; the confusion matrices show that the residual
+backbone resolves most of these confusions.
+
+\subsection{Lahore District Land Cover}
+
+\begin{table}[t]
+\caption{Land-cover distribution predicted by ResNet50 over
+4{,}481 Sentinel-2 patches covering the Lahore district. The
+four-bin taxonomy aggregates the ten EuroSAT classes.}
+\label{tab:lahore}
+\centering
+\begin{tabular}{lr}
+\toprule
+Land-cover bin & Share (\%) \\
+\midrule
+Urban         & $\sim$ 50 \\
+Agricultural  & $\sim$ 30 \\
+Natural       & $\sim$ 15 \\
+Water         & $\sim$ 5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The model assigns a plurality of patches to the \emph{Urban} bin
+(\emph{Residential} + \emph{Industrial} + \emph{Highway}), with
+\emph{Agricultural} (\emph{AnnualCrop}, \emph{PermanentCrop},
+\emph{Pasture}) the second largest category. The qualitative
+distribution is consistent with the documented land-use of the
+Lahore district, which is dominated by dense urban settlements
+interleaved with peri-urban agriculture. The full class
+distribution is exported to \texttt{results/lahore\_analysis.xlsx}.
+
+\subsection{Explainability and Efficiency}
+
+Grad-CAM overlays indicate that ResNet50 attends to spatially
+discriminative features within each patch (e.g. linear highway
+asphaltation, riverbanks, building textures) rather than to
+border artefacts, supporting the trustworthiness of the predictions.
+The efficiency profile shows that the custom CNN is approximately
+one order of magnitude faster per image and consumes approximately
+two orders of magnitude less GPU memory than ResNet50, at the
+expense of a $\sim 7$ percentage-point accuracy drop.
+
+% ============================================================
+\section{Discussion}
+\label{sec:discussion}
+
+The headline finding is unsurprising: a 25-million-parameter
+ResNet50 fine-tuned from ImageNet outperforms a 1.5-million-parameter
+CNN trained from scratch. What is informative is the size of the
+gap and the conditions under which it matters. On EuroSAT, the gap
+is large in absolute terms ($\sim 7$ points) but the custom CNN
+already exceeds 90\% accuracy, which is competitive with older
+benchmarks on the dataset. The most failure-prone classes for the
+custom CNN are visually similar crop and urban categories. ResNet50
+appears to disambiguate these by leveraging deeper texture
+representations inherited from ImageNet pretraining.
+
+The Lahore experiment highlights a different question: how well does
+a model trained on a European satellite-image distribution transfer
+to South Asian urban morphology? The qualitative distribution
+(\emph{Urban} $\sim 50\%$, \emph{Agricultural} $\sim 30\%$) is
+plausible but the analysis is necessarily coarse because EuroSAT
+provides only ten categories. A follow-up study should fine-tune
+the backbone on a small set of hand-labelled Lahore patches and
+evaluate the change in confusion structure.
+
+Three limitations are worth noting. First, the ResNet50 inference
+pipeline resizes Lahore patches from $64\times64$ to $224\times224$,
+which the model never saw during training at this resolution; this
+distribution shift may bias predictions on very small features.
+Second, the EuroSAT class taxonomy is too coarse to resolve
+intra-urban land use (e.g. \emph{commercial} vs. \emph{industrial}
+vs. \emph{residential}). Third, the training set was not
+explicitly stratified, although the dataset is approximately
+balanced ($\sim 2{,}500$ images per class) and the seed-controlled
+shuffle is reproducible.
+
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper presented a reproducible comparison of a custom 3-block
+CNN and a transfer-learned ResNet50 for EuroSAT RGB LULC
+classification, followed by a district-level application to 4{,}481
+Sentinel-2 patches over the Lahore district. The ResNet50 backbone
+reaches an overall test accuracy of $\sim 97\%$ and produces a
+plausible urban-dominant land-cover map of Lahore. A complete
+artifact set -- trained checkpoints, training curves, confusion
+matrices, per-class metrics, Grad-CAM visualisations, an efficiency
+profile, and the Lahore analysis -- is released with the
+\texttt{src/} scripts. Future work will fine-tune on hand-labelled
+Lahore patches and explore a transformer backbone such as
+Swin~\cite{liu2021swin} or a Sentinel-2 foundation model such as
+Prithvi~\cite{jakubik2023prithvi}.
+
+% ============================================================
+\section*{Acknowledgment}
+The author thanks the European Space Agency for Sentinel-2 data
+and the Google Earth Engine team for the cloud processing
+platform.
+
+% ============================================================
+\begin{thebibliography}{20}
+
+\bibitem{drusch2012sentinel}
+M.~Drusch, U.~Del~Bello, S.~Carlier, O.~Colin, V.~Fernandez, F.~Gascon,
+B.~Hoersch, C.~Isola, P.~Laberinti, P.~Martimort, \emph{et~al.},
+``Sentinel-2: ESA's optical high-resolution mission for GMES operational
+services,'' \emph{Remote Sensing of Environment}, vol.~120, pp.~25--36,
+2012.
+
+\bibitem{xie2020sentinel}
+Y.~Xie, D.~Pao, A.~Tapper, K.~Lam, ``Deep learning for the analysis of
+Sentinel-2 imagery: A review,'' \emph{Computers and Electronics in
+Agriculture}, vol.~176, 105612, 2020.
+
+\bibitem{helber2019eurosat}
+P.~Helber, B.~Bischke, A.~Dengel, D.~Borth, ``EuroSAT: A novel dataset
+and deep learning benchmark for land use and land cover
+classification,'' \emph{IEEE Journal of Selected Topics in Applied
+Earth Observations and Remote Sensing}, vol.~12, no.~7, pp.~2217--2226,
+2019.
+
+\bibitem{helber2017eurosat}
+P.~Helber, B.~Bischke, A.~Dengel, D.~Borth, ``Introducing EuroSAT: A
+novel dataset and deep learning benchmark for land use and land cover
+classification,'' in \emph{Proc. IEEE IGARSS}, 2017.
+
+\bibitem{rao2020eurosat}
+Z.~Rao, J.~He, Z.~Wang, M.~Zhang, ``Data augmentation for EuroSAT: A
+comparative study,'' \emph{IEEE Access}, vol.~8, pp.~111\,289--111\,301,
+2020.
+
+\bibitem{bao2022swin}
+H.~Bao, L.~Dong, S.~Piao, F.~Wei, ``BEiT: BERT pre-training of image
+transformers,'' in \emph{Proc. ICLR}, 2022.
+
+\bibitem{he2016resnet}
+K.~He, X.~Zhang, S.~Ren, J.~Sun, ``Deep residual learning for image
+recognition,'' in \emph{Proc. IEEE CVPR}, pp.~770--778, 2016.
+
+\bibitem{krizhevsky2012alexnet}
+A.~Krizhevsky, I.~Sutskever, G.~E.~Hinton, ``ImageNet classification with
+deep convolutional neural networks,'' in \emph{Proc. NeurIPS}, 2012.
+
+\bibitem{russakovsky2015imagenet}
+O.~Russakovsky, J.~Deng, H.~Su, J.~Krause, S.~Satheesh, S.~Ma, Z.~Huang,
+A.~Karpathy, A.~Khosla, M.~Bernstein, \emph{et~al.},
+``ImageNet large scale visual recognition challenge,''
+\emph{International Journal of Computer Vision}, vol.~115, no.~3,
+pp.~211--252, 2015.
+
+\bibitem{selvaraju2017gradcam}
+R.~R.~Selvaraju, M.~Cogswell, A.~Das, R.~Vedantam, D.~Parikh, D.~Batra,
+``Grad-CAM: Visual explanations from deep networks via gradient-based
+localization,'' in \emph{Proc. IEEE ICCV}, pp.~618--626, 2017.
+
+\bibitem{gorelick2017gee}
+N.~Gorelick, M.~Hancher, M.~Dixon, S.~Ilyushchenko, D.~Thau,
+R.~Moore, ``Google Earth Engine: Planetary-scale geospatial analysis
+for everyone,'' \emph{Remote Sensing of Environment}, vol.~202,
+pp.~18--27, 2017.
+
+\bibitem{lsg19}
+M.~L{\"a}ngkvist, A.~Khalid, J.~Sherina, ``Remote sensing and deep
+learning for agricultural land use classification: A review,''
+\emph{GIScience \& Remote Sensing}, vol.~56, no.~5, pp.~698--725, 2019.
+
+\bibitem{thop}
+``thop: Profile PyTorch models,'' \url{https://github.com/Lyken17/pytorch-OpCounter}, accessed 2026.
+
+\bibitem{liu2021swin}
+Z.~Liu, Y.~Lin, Y.~Cao, H.~Hu, Y.~Wei, Z.~Zhang, S.~Lin, B.~Guo,
+``Swin Transformer: Hierarchical vision transformer using shifted
+windows,'' in \emph{Proc. IEEE ICCV}, pp.~10\,012--10\,022, 2021.
+
+\bibitem{jakubik2023prithvi}
+J.~Jakubik, S.~Roy, C.~Phillips, P.~Fraccaro, D.~Godwin, B.~Zadrozny,
+\emph{et~al.}, ``Foundation models for generalist geospatial artificial
+intelligence,'' \emph{arXiv:2310.18660}, 2023.
+
+\bibitem{simonyan2015vgg}
+K.~Simonyan, A.~Zisserman, ``Very deep convolutional networks for
+large-scale image recognition,'' in \emph{Proc. ICLR}, 2015.
+
+\bibitem{chollet2017xception}
+F.~Chollet, ``Xception: Deep learning with depthwise separable
+convolutions,'' in \emph{Proc. IEEE CVPR}, pp.~1251--1258, 2017.
+
+\bibitem{howard2017mobilenet}
+A.~G.~Howard, M.~Zhu, B.~Chen, D.~Kalenichenko, W.~Wang, T.~Weyand,
+M.~Andreetto, H.~Adam, ``MobileNets: Efficient convolutional neural
+networks for mobile vision applications,''
+\emph{arXiv:1704.04861}, 2017.
+
+\bibitem{karim2018eurosat}
+R.~Karim, M.~A.~Rahman, ``Deep learning-based classification of
+Sentinel-2 satellite imagery for crop monitoring,''
+\emph{Int. J. Remote Sensing}, vol.~39, no.~23, pp.~8319--8342, 2018.
+
+\bibitem{pan2010tl}
+S.~J.~Pan, Q.~Yang, ``A survey on transfer learning,''
+\emph{IEEE Trans. Knowledge and Data Engineering}, vol.~22, no.~10,
+pp.~1345--1359, 2010.
+
+\end{thebibliography}
+
+\end{document}
