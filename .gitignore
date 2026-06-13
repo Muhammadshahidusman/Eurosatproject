@@ -15,6 +15,7 @@ eurosat_cnn_final.pth
 Eurosat_Dataset.zip
 *.zip
 data
+Documentation
 
 # Virtual environments
 .venv
