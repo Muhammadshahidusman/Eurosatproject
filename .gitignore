@@ -14,8 +14,11 @@ eurosat_cnn_final.pth
 
 Eurosat_Dataset.zip
 *.zip
-data
+/data/
 
 # Virtual environments
 .venv
 
+
+# Dashboard build scratch
+dashboard/.build/

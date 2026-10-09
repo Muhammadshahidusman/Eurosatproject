@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EuroSAT Land Cover Results</title>
+  <meta name="description" content="Results dashboard for a deep-learning land-use / land-cover study: custom CNN vs. transfer-learned ResNet50 on EuroSAT Sentinel-2 imagery, Grad-CAM explainability, and a Lahore district case study.">
+  <meta property="og:title" content="EuroSAT Land Cover Results">
+  <meta property="og:description" content="Custom CNN vs. ResNet50 on Sentinel-2: 97.41% test accuracy, Grad-CAM explainability, and land-cover maps of Lahore.">
+  <meta property="og:image" content="img/figures/lahore_comparison.webp">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M6 22l7-8 5 5 3-3 5 6z' fill='white'/%3E%3Ccircle cx='22' cy='10' r='3' fill='white'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css?v=6">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true"></span>EuroSAT · Lahore LULC</a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#study">Study area</a>
+      <a href="#results">Results</a>
+      <a href="#performance">Performance</a>
+      <a href="#explain">Explainability</a>
+      <a href="#lahore">Lahore</a>
+      <a href="#try" class="nav-try">Try the model</a>
+    </nav>
+    <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle theme">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="top">
+  <!-- ============================== HERO ============================== -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-text">
+        <p class="eyebrow">Deep learning · Remote sensing · Explainable AI</p>
+        <h1>Accuracy vs. efficiency in land-cover classification, from EuroSAT to Lahore</h1>
+        <p class="lede">A custom CNN and a transfer-learned ResNet50 were trained on 27,000 Sentinel-2 images,
+          profiled for computational cost, explained with Grad-CAM, and deployed over the Lahore district of Pakistan.</p>
+        <div class="hero-links">
+          <a class="btn primary" href="#results">See the results</a>
+          <a class="btn" href="#try">Try the model live</a>
+          <a class="btn ghost" id="repo-link" href="https://github.com/Muhammadshahidusman/Eurosatproject" target="_blank" rel="noopener">GitHub ↗</a>
+        </div>
+      </div>
+      <button type="button" class="hero-figure" data-lightbox="lahore_rgb_vs_resnet50" aria-label="Enlarge Lahore classification map">
+        <img src="img/figures/lahore_rgb_vs_resnet50.webp" alt="Lahore district: Sentinel-2 RGB composite beside the ResNet50 land-cover classification" width="2000" height="1044">
+        <span class="hero-figure-cap">Lahore district: Sentinel-2 RGB (left) and ResNet50 land-cover map (right)</span>
+      </button>
+    </div>
+    <div class="wrap">
+      <div class="kpis" id="kpis" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ============================== KEY FINDINGS ============================== -->
+  <section class="section tight" id="findings">
+    <div class="wrap">
+      <div class="findings">
+        <div class="finding">
+          <span class="f-num">+16.0 pts</span>
+          <p><strong>Transfer learning wins on accuracy.</strong> ResNet50 reaches 97.41% test accuracy against 81.38%
+            for the CNN trained from scratch, and macro F1 rises from 0.805 to 0.973.</p>
+        </div>
+        <div class="finding">
+          <span class="f-num">25.7×</span>
+          <p><strong>…at a real compute cost.</strong> 4.13 vs. 0.16 GMACs per image, 5.1× the parameters, and
+            8.3× the latency (14.9 vs. 1.8 ms on a Quadro P2000).</p>
+        </div>
+        <div class="finding">
+          <span class="f-num">0.59 → 0.99</span>
+          <p><strong>Hard classes become easy.</strong> Highway was the CNN's weakest class (F1 0.59). ResNet50 scores
+            it at 0.99, and every one of its classes is at or above 0.957.</p>
+        </div>
+        <div class="finding">
+          <span class="f-num">4,289</span>
+          <p><strong>District-scale deployment.</strong> Both models mapped every 640 m tile of Lahore. The maps show
+            the dense urban core, but the models' disagreement reveals domain shift.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== STUDY AREA & METHOD ============================== -->
+  <section class="section alt" id="study">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">01</span>
+        <h2>Study area &amp; methodology</h2>
+        <p>The benchmark is EuroSAT, 64 × 64 px Sentinel-2 tiles from 34 European countries. The deployment target is
+          Lahore district, Punjab, Pakistan, a rapidly urbanising semi-arid region.</p>
+      </div>
+      <div class="study-grid">
+        <figure class="fig card">
+          <button type="button" class="fig-img" data-lightbox="study_area" aria-label="Enlarge study area map">
+            <img src="img/figures/study_area.webp" alt="Study area map of Lahore district with elevation and location inset" loading="lazy" width="2000" height="1415">
+          </button>
+          <figcaption><b>Study area.</b> Lahore district boundary over elevation, with its location in Pakistan inset.</figcaption>
+        </figure>
+        <div class="card facts">
+          <h3>At a glance</h3>
+          <dl>
+            <div><dt>Benchmark</dt><dd>EuroSAT RGB · 27,000 images · 10 classes</dd></div>
+            <div><dt>Split</dt><dd>70 / 15 / 15 → 18,900 / 4,050 / 4,050 (seed 42)</dd></div>
+            <div><dt>Deployment</dt><dd>Lahore district, ≈ 1,760 km²</dd></div>
+            <div><dt>Imagery</dt><dd>Sentinel-2 L2A median composite, B4-B3-B2, 10 m</dd></div>
+            <div><dt>Period</dt><dd>Jan – Mar 2026, &lt; 10% cloud, QA60 masked</dd></div>
+            <div><dt>Raster</dt><dd>5,405 × 6,221 px → 84 × 97 tiles of 64 px</dd></div>
+            <div><dt>Platform</dt><dd>Google Earth Engine · PyTorch · Quadro P2000 (4 GB)</dd></div>
+          </dl>
+        </div>
+      </div>
+      <figure class="fig card wide">
+        <button type="button" class="fig-img" data-lightbox="methodology" aria-label="Enlarge methodology flowchart">
+          <img src="img/figures/methodology.webp" alt="Methodology flowchart from EuroSAT data through model training, evaluation, Grad-CAM and Lahore deployment" loading="lazy" width="2000" height="1208">
+        </button>
+        <figcaption><b>Methodology.</b> End-to-end pipeline: dataset preparation → parallel model training → evaluation, efficiency
+          and explainability → Lahore district deployment.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============================== RESULTS SUMMARY ============================== -->
+  <section class="section" id="results">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">02</span>
+        <h2>Results summary</h2>
+        <p>Both models evaluated on the same 4,050-image held-out test split.</p>
+      </div>
+      <div class="card table-card">
+        <table class="metrics" id="metrics-table"></table>
+        <p class="footnote" id="metrics-foot"></p>
+      </div>
+      <div class="downloads">
+        <span class="label">Download the data</span>
+        <a class="dl" href="data/downloads/metrics_export.xlsx" download>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3v10.6l3.3-3.3 1.4 1.4L12 16.4l-4.7-4.7 1.4-1.4 3.3 3.3V3h2zM5 19h14v2H5z"/></svg>
+          Accuracy &amp; training metrics <span>.xlsx</span></a>
+        <a class="dl" href="data/downloads/efficiency_metrics.xlsx" download>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3v10.6l3.3-3.3 1.4 1.4L12 16.4l-4.7-4.7 1.4-1.4 3.3 3.3V3h2zM5 19h14v2H5z"/></svg>
+          Efficiency profile <span>.xlsx</span></a>
+        <a class="dl" href="data/downloads/lahore_analysis.xlsx" download>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3v10.6l3.3-3.3 1.4 1.4L12 16.4l-4.7-4.7 1.4-1.4 3.3 3.3V3h2zM5 19h14v2H5z"/></svg>
+          Lahore predictions <span>.xlsx</span></a>
+      </div>
+
+      <div class="card block" id="training">
+        <div class="card-head">
+          <h3>Training dynamics</h3>
+          <div class="seg small tabs" role="tablist" data-tabs="training">
+            <button type="button" role="tab" class="on" data-tab="figure">Figure</button>
+            <button type="button" role="tab" data-tab="interactive">Interactive</button>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="training:figure">
+          <figure class="fig">
+            <button type="button" class="fig-img" data-lightbox="training_curves" aria-label="Enlarge training curves">
+              <img src="img/figures/training_curves.webp" alt="Loss and accuracy per epoch for both models" loading="lazy" width="2000" height="749">
+            </button>
+            <figcaption>ImageNet pre-training gets ResNet50 to 97% validation accuracy after one epoch. The CNN is still
+              improving when its 10-epoch budget ends.</figcaption>
+          </figure>
+        </div>
+        <div class="tab-panel" data-panel="training:interactive" hidden>
+          <div class="legend" id="curve-legend"></div>
+          <div class="two-col flat">
+            <div><h4 class="chart-title">Accuracy</h4><div id="acc-chart" class="chart"></div></div>
+            <div><h4 class="chart-title">Cross-entropy loss</h4><div id="loss-chart" class="chart"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== PERFORMANCE ============================== -->
+  <section class="section alt" id="performance">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">03</span>
+        <h2>Classification performance</h2>
+        <p>Row-normalised confusion matrices on the test split. The CNN confuses visually similar vegetation classes
+          and roads. ResNet50 resolves almost all of these confusions.</p>
+      </div>
+      <div class="two-col">
+        <figure class="fig card">
+          <button type="button" class="fig-img" data-lightbox="confusion_cnn" aria-label="Enlarge CNN confusion matrix">
+            <img src="img/figures/confusion_cnn.webp" alt="Confusion matrix of the custom CNN" loading="lazy" width="2000" height="1823">
+          </button>
+          <figcaption><b>Custom CNN</b>: 81.38% accuracy. Main errors are HerbVeg → PermanentCrop (0.22) and River → Highway (0.21).</figcaption>
+        </figure>
+        <figure class="fig card">
+          <button type="button" class="fig-img" data-lightbox="confusion_resnet50" aria-label="Enlarge ResNet50 confusion matrix">
+            <img src="img/figures/confusion_resnet50.webp" alt="Confusion matrix of ResNet50" loading="lazy" width="2000" height="1823">
+          </button>
+          <figcaption><b>ResNet50</b>: 97.41% accuracy. The largest remaining error is Industrial → Residential (0.06).</figcaption>
+        </figure>
+      </div>
+
+      <div class="card block">
+        <div class="card-head">
+          <h3>Per-class precision, recall &amp; F1</h3>
+          <div class="seg small tabs" role="tablist" data-tabs="perclass">
+            <button type="button" role="tab" class="on" data-tab="figure">Figure</button>
+            <button type="button" role="tab" data-tab="interactive">Interactive</button>
+            <button type="button" role="tab" data-tab="table">Table</button>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="perclass:figure">
+          <figure class="fig">
+            <button type="button" class="fig-img" data-lightbox="per_class_metrics" aria-label="Enlarge per-class metrics">
+              <img src="img/figures/per_class_metrics.webp" alt="Grouped bar chart of per-class precision, recall and F1 for both models" loading="lazy" width="2000" height="835">
+            </button>
+          </figure>
+        </div>
+        <div class="tab-panel" data-panel="perclass:interactive" hidden>
+          <div class="two-col flat">
+            <div>
+              <div class="card-head"><h4 class="chart-title">F1 by class</h4><div class="legend" id="f1-legend"></div></div>
+              <div id="f1-chart" class="chart"></div>
+            </div>
+            <div>
+              <div class="card-head">
+                <h4 class="chart-title">Confusion matrix</h4>
+                <div class="seg small" role="group" aria-label="Confusion matrix model" id="cm-toggle">
+                  <button type="button" data-model="resnet50" class="on">ResNet50</button>
+                  <button type="button" data-model="cnn">CNN</button>
+                </div>
+              </div>
+              <div id="cm-chart" class="chart"></div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="perclass:table" hidden>
+          <div class="table-scroll"><table class="metrics small" id="perclass-table"></table></div>
+        </div>
+      </div>
+
+      <div class="eff-grid" id="efficiency">
+        <figure class="fig card">
+          <button type="button" class="fig-img" data-lightbox="efficiency_bubble" aria-label="Enlarge efficiency chart">
+            <img src="img/figures/efficiency_bubble.webp" alt="Bubble chart of parameters vs. latency with bubble area proportional to GMACs" loading="lazy" width="2000" height="1406">
+          </button>
+          <figcaption><b>Efficiency profile.</b> Parameters vs. median latency (log–log). Bubble area is proportional to GMACs.</figcaption>
+        </figure>
+        <div class="card">
+          <h3>Computational cost</h3>
+          <table class="metrics small eff-table" id="eff-table"></table>
+          <p class="footnote">Measured with <code>thop</code> and CUDA-synchronised timing at batch size 1 on an NVIDIA Quadro P2000.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== EXPLAINABILITY ============================== -->
+  <section class="section" id="explain">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">04</span>
+        <h2>Explainability with Grad-CAM</h2>
+        <p>Heatmaps show which regions drive ResNet50's decision. They follow road edges for Highway, river channels for
+          River, and repeated building texture for Residential.</p>
+      </div>
+      <div class="card block">
+        <div class="card-head">
+          <h3>Grad-CAM heatmaps (ResNet50)</h3>
+          <div class="seg small tabs" role="tablist" data-tabs="gradcam">
+            <button type="button" role="tab" class="on" data-tab="figure">Figure</button>
+            <button type="button" role="tab" data-tab="gallery">Test-set gallery</button>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="gradcam:figure">
+          <figure class="fig narrow">
+            <button type="button" class="fig-img" data-lightbox="gradcam_grid" aria-label="Enlarge Grad-CAM grid">
+              <img src="img/figures/gradcam_grid.webp" alt="Grid of 20 EuroSAT images with Grad-CAM heatmaps and predicted labels" loading="lazy" width="1971" height="2000">
+            </button>
+            <figcaption>Grad-CAM on <code>layer4[-1]</code> for 20 EuroSAT images with true and predicted labels.</figcaption>
+          </figure>
+        </div>
+        <div class="tab-panel" data-panel="gradcam:gallery" hidden>
+          <p class="muted small panel-note">38 images drawn strictly from the held-out test split, including 8 ResNet50 errors.</p>
+          <div class="filters" id="cam-filters" role="group" aria-label="Grad-CAM filter"></div>
+          <div class="cam-grid" id="cam-grid"></div>
+          <div class="more-row"><button type="button" class="btn" id="cam-more" hidden>Show all</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== LAHORE ============================== -->
+  <section class="section alt" id="lahore">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">05</span>
+        <h2>Case study: Lahore district</h2>
+        <p>The trained models were applied to every 64 × 64 px tile (640 m × 640 m) of the Sentinel-2 composite.</p>
+      </div>
+      <figure class="fig card wide">
+        <button type="button" class="fig-img" data-lightbox="lahore_comparison" aria-label="Enlarge model comparison maps">
+          <img src="img/figures/lahore_comparison.webp" alt="Lahore RGB composite beside custom CNN and ResNet50 classification maps" loading="lazy" width="2000" height="665">
+        </button>
+        <figcaption><b>Model comparison.</b> Sentinel-2 RGB (left), custom CNN (centre) and ResNet50 (right). ResNet50 picks
+          out the dense residential core and the main road network, while the CNN labels most of the district as cropland.</figcaption>
+      </figure>
+
+      <div class="card block">
+        <div class="card-head">
+          <h3>Maps &amp; statistics</h3>
+          <div class="seg small tabs" role="tablist" data-tabs="lahore">
+            <button type="button" role="tab" class="on" data-tab="maps">Maps</button>
+            <button type="button" role="tab" data-tab="stats">Land-cover statistics</button>
+            <button type="button" role="tab" data-tab="interactive">Interactive map</button>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="lahore:maps">
+          <div class="two-col flat">
+            <figure class="fig">
+              <button type="button" class="fig-img" data-lightbox="lahore_rgb_vs_resnet50" aria-label="Enlarge ResNet50 map">
+                <img src="img/figures/lahore_rgb_vs_resnet50.webp" alt="RGB vs ResNet50 classification of Lahore" loading="lazy" width="2000" height="1044">
+              </button>
+              <figcaption><b>ResNet50</b> vs. RGB</figcaption>
+            </figure>
+            <figure class="fig">
+              <button type="button" class="fig-img" data-lightbox="lahore_rgb_vs_cnn" aria-label="Enlarge CNN map">
+                <img src="img/figures/lahore_rgb_vs_cnn.webp" alt="RGB vs custom CNN classification of Lahore" loading="lazy" width="2000" height="1044">
+              </button>
+              <figcaption><b>Custom CNN</b> vs. RGB</figcaption>
+            </figure>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="lahore:stats" hidden>
+          <div class="two-col flat">
+            <figure class="fig">
+              <button type="button" class="fig-img" data-lightbox="lahore_pie" aria-label="Enlarge land-cover share chart">
+                <img src="img/figures/lahore_pie.webp" alt="Donut chart of four land-cover bins predicted by ResNet50" loading="lazy" width="2000" height="1604">
+              </button>
+              <figcaption><b>Four-bin land cover</b> (ResNet50, 4,481 patches): Agricultural 45.6%, Natural 29.3%, Urban 23.3%, Water 1.9%.</figcaption>
+            </figure>
+            <figure class="fig">
+              <button type="button" class="fig-img" data-lightbox="lahore_class_distribution" aria-label="Enlarge class distribution chart">
+                <img src="img/figures/lahore_class_distribution.webp" alt="Bar chart of predicted EuroSAT class shares in Lahore" loading="lazy" width="2000" height="899">
+              </button>
+              <figcaption><b>EuroSAT class distribution</b> over the same 4,481 patches, coloured by bin.</figcaption>
+            </figure>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="lahore:interactive" hidden>
+          <div class="lahore-grid">
+            <div>
+              <div class="map-controls">
+                <div class="seg small" role="group" aria-label="Map layer" id="map-toggle">
+                  <button type="button" data-layer="resnet50" class="on">ResNet50</button>
+                  <button type="button" data-layer="cnn">CNN</button>
+                  <button type="button" data-layer="disagree">Disagreement</button>
+                  <button type="button" data-layer="rgb">RGB only</button>
+                </div>
+                <label class="slider">Overlay
+                  <input type="range" id="opacity" min="0" max="100" value="70" aria-label="Overlay opacity">
+                </label>
+              </div>
+              <div class="map-wrap" id="map-wrap">
+                <img id="map-rgb" src="img/lahore_rgb.jpg" alt="Sentinel-2 true-colour composite of Lahore district" loading="lazy">
+                <canvas id="map-canvas"></canvas>
+                <div class="tip" id="map-tip" hidden></div>
+              </div>
+              <p class="footnote" id="map-foot"></p>
+            </div>
+            <div>
+              <div class="card-head"><h4 class="chart-title">Tile share by class</h4><div class="legend" id="lahore-legend"></div></div>
+              <div id="lahore-bars"></div>
+              <p class="footnote">Hover a tile to compare both models, or click a class to isolate it.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Interpreting the Lahore results</strong>
+        EuroSAT was collected in Europe, so Lahore is out-of-distribution for both models. The two models agree on
+        <span id="agree-pct">-</span> of tiles, and there is no labelled ground truth for the district yet. The maps are a
+        qualitative baseline. Validating against ESA WorldCover is the planned next step.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== TRY IT (extra) ============================== -->
+  <section class="section try" id="try">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">Extra</span>
+        <h2>Try the model yourself</h2>
+        <p>Both trained models run directly in your browser through ONNX Runtime Web. Pick a test image or upload your
+          own satellite tile. Nothing is uploaded to a server.</p>
+      </div>
+      <div class="classify-grid">
+        <div class="card">
+          <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload an image">
+            <input type="file" id="file" accept="image/*" hidden>
+            <canvas id="preview" width="224" height="224" aria-label="Selected image"></canvas>
+            <div class="drop-hint" id="drop-hint">
+              <strong>Drop an image</strong> or click to upload<br>
+              <span class="muted">Center-cropped and resized to a 64 × 64 px tile (≈ 640 m at 10 m/px)</span>
+            </div>
+          </div>
+          <div class="sample-head">
+            <span class="label">Test-set samples</span>
+            <button class="link-btn" id="random-sample" type="button">Random</button>
+          </div>
+          <div class="samples" id="samples" role="listbox" aria-label="Test-set samples"></div>
+        </div>
+
+        <div class="card result-card">
+          <div class="result-top">
+            <div>
+              <span class="label">Ground truth</span>
+              <div class="truth" id="truth">-</div>
+            </div>
+            <div class="seg" role="group" aria-label="Model">
+              <button type="button" data-model="both" class="on">Both</button>
+              <button type="button" data-model="resnet50">ResNet50</button>
+              <button type="button" data-model="cnn">CNN</button>
+            </div>
+          </div>
+          <div id="predictions" class="results"></div>
+          <div class="cam-row" id="cam-row" hidden>
+            <figure>
+              <img id="cam-orig" alt="Input tile upsampled">
+              <figcaption>Input</figcaption>
+            </figure>
+            <figure>
+              <img id="cam-img" alt="Grad-CAM overlay">
+              <figcaption>ResNet50 Grad-CAM</figcaption>
+            </figure>
+          </div>
+          <p class="status muted" id="status">Select an image to run the models.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== LIMITATIONS ============================== -->
+  <section class="section alt" id="method">
+    <div class="wrap">
+      <div class="section-head"><span class="kicker">06</span><h2>Limitations &amp; next steps</h2></div>
+      <div class="method-grid">
+        <div class="card">
+          <h3>Limitations</h3>
+          <ul>
+            <li>RGB only. The other 10 Sentinel-2 spectral bands are not used.</li>
+            <li>The CNN trained for only 10 epochs and was still improving, so part of the gap is training budget.</li>
+            <li>Lahore has no ground truth yet, and 640 m tiles mix several land-cover types.</li>
+            <li>European training scenes vs. a South Asian winter composite introduce domain shift.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Next steps</h3>
+          <ul>
+            <li>Validate the Lahore maps against ESA WorldCover and Dynamic World.</li>
+            <li>Fine-tune on a small set of labelled Lahore tiles to close the domain gap.</li>
+            <li>Add multispectral input (13 bands) and lighter backbones such as MobileNet and EfficientNet.</li>
+            <li>Multi-year composites for land-cover change detection.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <span>Built by <strong id="author">Shahid Usman</strong> · PyTorch · Google Earth Engine · ONNX Runtime Web</span>
+    <span class="muted">EuroSAT © Helber et al. (2019), MIT licence · Contains modified Copernicus Sentinel-2 data</span>
+  </div>
+</footer>
+
+<dialog class="lightbox" id="lightbox" aria-label="Figure viewer">
+  <button type="button" class="lb-close" id="lb-close" aria-label="Close">✕</button>
+  <button type="button" class="lb-nav prev" id="lb-prev" aria-label="Previous figure">‹</button>
+  <figure>
+    <img id="lb-img" alt="">
+    <figcaption id="lb-cap"></figcaption>
+  </figure>
+  <button type="button" class="lb-nav next" id="lb-next" aria-label="Next figure">›</button>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js" defer></script>
+<script src="assets/charts.js?v=6" defer></script>
+<script src="assets/app.js?v=6" defer></script>
+</body>
+</html>
